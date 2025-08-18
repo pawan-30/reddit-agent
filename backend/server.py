@@ -204,7 +204,7 @@ async def analyze_posts(post_ids: List[str]):
                 continue
                 
             # Check if analysis already exists
-            existing_analysis = await db.post_analyses.find_one({"post_id": post_id})
+            existing_analysis = await db.post_analyses.find_one({"post_id": post_id}, {"_id": 0})
             if existing_analysis:
                 analyses.append(existing_analysis)
                 continue
