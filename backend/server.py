@@ -278,12 +278,12 @@ async def get_posts(limit: int = 50, min_relevance: Optional[float] = None):
     """Get stored posts with optional relevance filtering"""
     try:
         # Get posts
-        posts = await db.reddit_posts.find().sort("scraped_at", -1).limit(limit).to_list(length=None)
+        posts = await db.reddit_posts.find({}, {"_id": 0}).sort("scraped_at", -1).limit(limit).to_list(length=None)
         
         # Get analyses
         post_ids = [post['id'] for post in posts]
         analyses = await db.post_analyses.find(
-            {"post_id": {"$in": post_ids}}
+            {"post_id": {"$in": post_ids}}, {"_id": 0}
         ).to_list(length=None)
         
         # Create analyses lookup
