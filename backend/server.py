@@ -309,7 +309,7 @@ async def get_posts(limit: int = 50, min_relevance: Optional[float] = None):
 async def get_trends(limit: int = 10):
     """Get trend syntheses"""
     try:
-        trends = await db.trend_syntheses.find().sort("created_at", -1).limit(limit).to_list(length=None)
+        trends = await db.trend_syntheses.find({}, {"_id": 0}).sort("created_at", -1).limit(limit).to_list(length=None)
         return {"trends": trends}
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
