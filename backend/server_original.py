@@ -13,6 +13,7 @@ import re
 from urllib.parse import urljoin, urlparse
 from dotenv import load_dotenv
 from motor.motor_asyncio import AsyncIOMotorClient
+from emergentintegrations.llm.chat import LlmChat, UserMessage
 
 # Load environment variables
 load_dotenv()
@@ -75,6 +76,29 @@ TARGET_SUBREDDITS = [
     "aging", "QuantifiedSelf"
 ]
 
+# Initialize Claude chat
+async def get_claude_chat():
+    api_key = os.environ.get("EMERGENT_LLM_KEY")
+    chat = LlmChat(
+        api_key=api_key,
+        session_id=str(uuid.uuid4()),
+        system_message="""You are an expert analyst for Eon Health, a company that positions itself as "Your Operating System for Healthspan." 
+        
+        Eon Health uses AI, data science, and user-centric design to provide personalized health insights, integrating with wearable technology to deliver tailored recommendations for nutrition, exercise, sleep, and lifestyle adjustments.
+        
+        Key focus areas:
+        - Personalized health optimization
+        - AI-driven health insights
+        - Wearable technology integration
+        - Preventive healthcare
+        - Chronic disease prevention
+        - Healthspan extension (not just lifespan)
+        - Scientific-backed recommendations
+        
+        Your role is to analyze Reddit posts and determine their relevance to Eon Health's business, extract actionable insights, and suggest engagement strategies."""
+    ).with_model("anthropic", "claude-3-7-sonnet-20250219")
+    return chat
+
 class RedditScraper:
     def __init__(self):
         self.headers = {
@@ -130,34 +154,6 @@ class RedditScraper:
         all_posts.sort(key=lambda x: x.get('score', 0), reverse=True)
         return all_posts[:max_posts]
 
-# Mock analysis function for testing
-def mock_analyze_post(post):
-    """Mock analysis function that returns dummy data"""
-    # Simple relevance scoring based on keywords
-    health_keywords = ['health', 'wellness', 'AI', 'personalized', 'biohacking', 'longevity', 'aging', 'fitness']
-    title_lower = post['title'].lower()
-    content_lower = post['content'].lower()
-    
-    relevance_score = 0
-    for keyword in health_keywords:
-        if keyword in title_lower:
-            relevance_score += 15
-        if keyword in content_lower:
-            relevance_score += 10
-    
-    relevance_score = min(relevance_score, 100)
-    
-    return {
-        "relevance_score": relevance_score,
-        "takeaways": [
-            f"Post discusses {post['subreddit']} community interests",
-            f"Received {post['upvotes']} upvotes indicating community engagement",
-            "Potential opportunity for Eon Health engagement"
-        ],
-        "suggested_response": f"Great insights! At Eon Health, we're working on similar personalized health solutions.",
-        "targeting_insights": f"The r/{post['subreddit']} community shows interest in health optimization topics."
-    }
-
 # API Routes
 @app.post("/api/search-reddit")
 async def search_reddit_posts(request: SearchRequest):
@@ -195,6 +191,7 @@ async def search_reddit_posts(request: SearchRequest):
 async def analyze_posts(post_ids: List[str]):
     """Analyze posts for relevance and extract insights"""
     try:
+        claude_chat = await get_claude_chat()
         analyses = []
         
         for post_id in post_ids:
@@ -209,21 +206,59 @@ async def analyze_posts(post_ids: List[str]):
                 analyses.append(existing_analysis)
                 continue
             
-            # Mock analysis for testing
-            analysis_data = mock_analyze_post(post)
-            
-            # Create analysis object
-            analysis = PostAnalysis(
-                post_id=post_id,
-                relevance_score=float(analysis_data.get('relevance_score', 0)),
-                takeaways=analysis_data.get('takeaways', []),
-                suggested_response=analysis_data.get('suggested_response', ''),
-                targeting_insights=analysis_data.get('targeting_insights', '')
-            )
-            
-            # Store analysis
-            await db.post_analyses.insert_one(analysis.dict())
-            analyses.append(analysis.dict())
+            # Prepare analysis prompt
+            analysis_prompt = f"""Analyze this Reddit post for relevance to Eon Health:
+
+Title: {post['title']}
+Content: {post['content'][:1000]}...
+Subreddit: r/{post['subreddit']}
+Upvotes: {post['upvotes']}
+Comments: {post['comments_count']}
+
+Please provide:
+1. Relevance score (0-100) - how relevant this post is to Eon Health's business
+2. Key takeaways (3-5 bullet points)
+3. Suggested response/comment we could make (if relevant)
+4. Community targeting insights
+
+Format your response as JSON:
+{
+  "relevance_score": 0-100,
+  "takeaways": ["takeaway1", "takeaway2", ...],
+  "suggested_response": "suggested comment text",
+  "targeting_insights": "insights about this community"
+}"""
+
+            try:
+                # Get Claude analysis
+                message = UserMessage(text=analysis_prompt)
+                response = await claude_chat.send_message(message)
+                
+                # Parse response
+                response_text = response.strip()
+                if response_text.startswith('```json'):
+                    response_text = response_text[7:-3].strip()
+                elif response_text.startswith('```'):
+                    response_text = response_text[3:-3].strip()
+                
+                analysis_data = json.loads(response_text)
+                
+                # Create analysis object
+                analysis = PostAnalysis(
+                    post_id=post_id,
+                    relevance_score=float(analysis_data.get('relevance_score', 0)),
+                    takeaways=analysis_data.get('takeaways', []),
+                    suggested_response=analysis_data.get('suggested_response', ''),
+                    targeting_insights=analysis_data.get('targeting_insights', '')
+                )
+                
+                # Store analysis
+                await db.post_analyses.insert_one(analysis.dict())
+                analyses.append(analysis.dict())
+                
+            except Exception as e:
+                print(f"Error analyzing post {post_id}: {e}")
+                continue
                 
         return {"analyses": analyses}
         
@@ -242,27 +277,68 @@ async def synthesize_trends(query: str, min_relevance: float = 50.0):
         if len(analyses) < 2:
             return {"message": "Not enough relevant posts for trend analysis"}
         
-        # Mock trend synthesis
+        # Get corresponding posts
+        post_ids = [analysis['post_id'] for analysis in analyses]
+        posts = await db.reddit_posts.find(
+            {"id": {"$in": post_ids}}
+        ).to_list(length=None)
+        
+        # Create posts lookup
+        posts_lookup = {post['id']: post for post in posts}
+        
+        # Prepare trend synthesis prompt
+        synthesis_prompt = f"""Based on these {len(analyses)} highly relevant Reddit posts about health/longevity/AI, synthesize key trends and insights for Eon Health:
+
+POSTS ANALYSIS:
+"""
+        
+        for analysis in analyses[:10]:  # Limit to top 10 for prompt length
+            post = posts_lookup.get(analysis['post_id'], {})
+            synthesis_prompt += f"""
+Post: {post.get('title', 'Unknown')} (r/{post.get('subreddit', 'unknown')})
+Relevance: {analysis['relevance_score']}/100
+Takeaways: {', '.join(analysis['takeaways'])}
+---
+"""
+        
+        synthesis_prompt += f"""
+
+Please provide:
+1. Key trends (5-7 major themes across these posts)
+2. Community insights by subreddit
+3. Strategic recommendations for Eon Health
+
+Format as JSON:
+{
+  "key_trends": ["trend1", "trend2", ...],
+  "community_insights": {
+    "r/longevity": "insights about this community",
+    "r/Biohackers": "insights about this community"
+  },
+  "suggested_strategies": ["strategy1", "strategy2", ...]
+}"""
+
+        # Get Claude synthesis
+        claude_chat = await get_claude_chat()
+        message = UserMessage(text=synthesis_prompt)
+        response = await claude_chat.send_message(message)
+        
+        # Parse response
+        response_text = response.strip()
+        if response_text.startswith('```json'):
+            response_text = response_text[7:-3].strip()
+        elif response_text.startswith('```'):
+            response_text = response_text[3:-3].strip()
+            
+        synthesis_data = json.loads(response_text)
+        
+        # Create trend synthesis
         trend_synthesis = TrendSynthesis(
             query=query,
             posts_analyzed=len(analyses),
-            key_trends=[
-                "Increasing interest in personalized health solutions",
-                "Growing adoption of AI in healthcare",
-                "Community focus on preventive medicine",
-                "Rising popularity of biohacking techniques",
-                "Integration of wearable technology with health monitoring"
-            ],
-            community_insights={
-                "r/longevity": "Highly engaged community focused on extending healthspan",
-                "r/Biohackers": "Tech-savvy users interested in self-optimization",
-                "r/science": "Evidence-based discussions about health research"
-            },
-            suggested_strategies=[
-                "Engage with longevity community through educational content",
-                "Share research-backed insights in science communities",
-                "Participate in biohacking discussions with practical tips"
-            ]
+            key_trends=synthesis_data.get('key_trends', []),
+            community_insights=synthesis_data.get('community_insights', {}),
+            suggested_strategies=synthesis_data.get('suggested_strategies', [])
         )
         
         # Store synthesis
