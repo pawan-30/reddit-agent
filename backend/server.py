@@ -78,14 +78,26 @@ TARGET_SUBREDDITS = [
 class RedditScraper:
     def __init__(self):
         self.headers = {
-            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36'
+            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+            'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8',
+            'Accept-Language': 'en-US,en;q=0.5',
+            'Accept-Encoding': 'gzip, deflate',
+            'Connection': 'keep-alive',
+            'Upgrade-Insecure-Requests': '1',
         }
+        self.session = requests.Session()
+        self.session.headers.update(self.headers)
 
-    def scrape_subreddit_hot(self, subreddit: str, limit: int = 10) -> List[Dict]:
-        """Scrape hot posts from a subreddit"""
+    def scrape_subreddit_search(self, subreddit: str, query: str, limit: int = 10) -> List[Dict]:
+        """Search posts within a specific subreddit"""
         try:
-            url = f"https://www.reddit.com/r/{subreddit}/hot/.json?limit={limit}"
-            response = requests.get(url, headers=self.headers)
+            # Use Reddit search within subreddit
+            search_url = f"https://www.reddit.com/r/{subreddit}/search.json?q={query}&restrict_sr=1&sort=hot&limit={limit}"
+            
+            import time
+            time.sleep(1)  # Rate limiting
+            
+            response = self.session.get(search_url, timeout=10)
             response.raise_for_status()
             
             data = response.json()
@@ -106,7 +118,7 @@ class RedditScraper:
                     'author': post_data.get('author', '[deleted]'),
                     'upvotes': post_data.get('ups', 0),
                     'comments_count': post_data.get('num_comments', 0),
-                    'url': f"https://reddit.com{post_data.get('permalink', '')}",
+                    'url': f"https://www.reddit.com{post_data.get('permalink', '')}",
                     'created_at': str(datetime.fromtimestamp(post_data.get('created_utc', 0), tz=timezone.utc)),
                     'score': post_data.get('score', 0)
                 }
@@ -114,140 +126,88 @@ class RedditScraper:
                 
             return posts
         except Exception as e:
+            print(f"Error searching r/{subreddit} for '{query}': {e}")
+            return []
+
+    def scrape_subreddit_hot(self, subreddit: str, limit: int = 10) -> List[Dict]:
+        """Scrape hot posts from a subreddit"""
+        try:
+            # Try multiple approaches
+            urls_to_try = [
+                f"https://www.reddit.com/r/{subreddit}/hot.json?limit={limit}",
+                f"https://www.reddit.com/r/{subreddit}.json?limit={limit}",
+            ]
+            
+            for url in urls_to_try:
+                try:
+                    import time
+                    time.sleep(0.5)  # Rate limiting
+                    
+                    response = self.session.get(url, timeout=10)
+                    if response.status_code == 200:
+                        data = response.json()
+                        posts = []
+                        
+                        for item in data.get('data', {}).get('children', []):
+                            post_data = item.get('data', {})
+                            
+                            # Skip if deleted or removed
+                            if post_data.get('removed_by_category') or not post_data.get('title'):
+                                continue
+                                
+                            post = {
+                                'id': post_data.get('id', ''),
+                                'title': post_data.get('title', ''),
+                                'content': post_data.get('selftext', ''),
+                                'subreddit': subreddit,
+                                'author': post_data.get('author', '[deleted]'),
+                                'upvotes': post_data.get('ups', 0),
+                                'comments_count': post_data.get('num_comments', 0),
+                                'url': f"https://www.reddit.com{post_data.get('permalink', '')}",
+                                'created_at': str(datetime.fromtimestamp(post_data.get('created_utc', 0), tz=timezone.utc)),
+                                'score': post_data.get('score', 0)
+                            }
+                            posts.append(post)
+                            
+                        return posts
+                        
+                except requests.exceptions.RequestException:
+                    continue
+                    
+            return []
+        except Exception as e:
             print(f"Error scraping r/{subreddit}: {e}")
             return []
 
     def search_reddit(self, query: str, subreddits: List[str], max_posts: int = 20) -> List[Dict]:
         """Search Reddit posts across multiple subreddits"""
         all_posts = []
-        posts_per_subreddit = max(1, max_posts // len(subreddits))
+        posts_per_subreddit = max(2, max_posts // len(subreddits))
         
+        # First try targeted search within each subreddit
         for subreddit in subreddits:
-            posts = self.scrape_subreddit_hot(subreddit, posts_per_subreddit)
-            all_posts.extend(posts)
+            # Try search first
+            search_posts = self.scrape_subreddit_search(subreddit, query, posts_per_subreddit // 2)
+            all_posts.extend(search_posts)
             
-        # If no posts were scraped (due to blocking), generate sample posts
+            # If search didn't return enough, get hot posts
+            if len(search_posts) < posts_per_subreddit // 2:
+                hot_posts = self.scrape_subreddit_hot(subreddit, posts_per_subreddit - len(search_posts))
+                # Filter hot posts by query relevance
+                relevant_hot_posts = [
+                    post for post in hot_posts 
+                    if any(keyword.lower() in post['title'].lower() or keyword.lower() in post['content'].lower() 
+                           for keyword in query.split())
+                ]
+                all_posts.extend(relevant_hot_posts)
+            
+        # If no posts found, return error message
         if not all_posts:
-            all_posts = self.generate_sample_posts(query, subreddits[:5], max_posts)
+            return []
             
         # Sort by score and limit
         all_posts.sort(key=lambda x: x.get('score', 0), reverse=True)
         return all_posts[:max_posts]
-    
-    def generate_sample_posts(self, query: str, subreddits: List[str], count: int = 10) -> List[Dict]:
-        """Generate sample posts when Reddit scraping is blocked"""
-        sample_posts = [
-            {
-                'id': f'sample_post_1_{hash(query) % 10000}',
-                'title': f'AI-powered personalized health recommendations are revolutionizing healthcare',
-                'content': f'The integration of AI in healthcare is enabling personalized treatment plans based on individual biomarkers, lifestyle data, and genetic information. This approach is showing promising results in preventing chronic diseases and optimizing health outcomes. What are your thoughts on AI-driven health optimization?',
-                'subreddit': 'longevity',
-                'author': 'health_researcher',
-                'upvotes': 156,
-                'comments_count': 43,
-                'url': 'https://www.reddit.com/r/longevity/comments/1avxm8l/ai_powered_personalized_health_recommendations/',
-                'created_at': str(datetime.now(timezone.utc)),
-                'score': 156
-            },
-            {
-                'id': f'sample_post_2_{hash(query) % 10000}',
-                'title': 'Wearable devices for continuous health monitoring: game changer or privacy concern?',
-                'content': f'Recent advances in wearable technology allow for 24/7 monitoring of vital signs, sleep patterns, and activity levels. While this data can provide valuable health insights, there are growing concerns about data privacy and security. How do we balance health benefits with privacy?',
-                'subreddit': 'Biohackers',
-                'author': 'techhealth_enthusiast',
-                'upvotes': 89,
-                'comments_count': 27,
-                'url': 'https://www.reddit.com/r/Biohackers/comments/1b2k9x7/wearable_devices_continuous_health_monitoring/',
-                'created_at': str(datetime.now(timezone.utc)),
-                'score': 89
-            },
-            {
-                'id': f'sample_post_3_{hash(query) % 10000}',
-                'title': 'The future of preventive medicine: AI algorithms predicting disease risk',
-                'content': f'Machine learning models are becoming increasingly accurate at predicting disease risk years before symptoms appear. This could revolutionize preventive healthcare by enabling early interventions. What preventive measures do you think will become mainstream?',
-                'subreddit': 'Futurology',
-                'author': 'future_medicine',
-                'upvotes': 234,
-                'comments_count': 67,
-                'url': 'https://www.reddit.com/r/Futurology/comments/1b8m2n4/future_preventive_medicine_ai_algorithms/',
-                'created_at': str(datetime.now(timezone.utc)),
-                'score': 234
-            },
-            {
-                'id': f'sample_post_4_{hash(query) % 10000}',
-                'title': 'Biohacking your sleep: optimal sleep tracking and improvement strategies',
-                'content': f'Sleep optimization through data-driven approaches is becoming more sophisticated. From sleep stage tracking to environmental controls, modern biohackers are achieving remarkable improvements in sleep quality. Share your best sleep biohacking tips!',
-                'subreddit': 'QuantifiedSelf',
-                'author': 'sleep_optimizer',
-                'upvotes': 112,
-                'comments_count': 34,
-                'url': 'https://www.reddit.com/r/QuantifiedSelf/comments/1b5p7k9/biohacking_sleep_optimal_tracking_strategies/',
-                'created_at': str(datetime.now(timezone.utc)),
-                'score': 112
-            },
-            {
-                'id': f'sample_post_5_{hash(query) % 10000}',
-                'title': 'Longevity research breakthrough: extending healthspan with personalized interventions',
-                'content': f'Recent studies show that personalized lifestyle interventions based on genetic and biomarker analysis can significantly extend healthy lifespan. The focus is shifting from just living longer to living healthier for longer. What longevity strategies are you most excited about?',
-                'subreddit': 'science',
-                'author': 'longevity_researcher',
-                'upvotes': 287,
-                'comments_count': 91,
-                'url': 'https://www.reddit.com/r/science/comments/1b9x4h2/longevity_research_breakthrough_extending/',
-                'created_at': str(datetime.now(timezone.utc)),
-                'score': 287
-            },
-            {
-                'id': f'sample_post_6_{hash(query) % 10000}',
-                'title': 'How AI is transforming personalized nutrition and dietary recommendations',
-                'content': f'Artificial intelligence is analyzing genetic data, microbiome profiles, and metabolic markers to create highly personalized nutrition plans. This approach could revolutionize how we think about diet and health optimization.',
-                'subreddit': 'artificial',
-                'author': 'nutrition_ai_expert',
-                'upvotes': 178,
-                'comments_count': 52,
-                'url': 'https://www.reddit.com/r/artificial/comments/1bc3m7x/ai_transforming_personalized_nutrition/',
-                'created_at': str(datetime.now(timezone.utc)),
-                'score': 178
-            },
-            {
-                'id': f'sample_post_7_{hash(query) % 10000}',
-                'title': 'The singularity of health: when AI becomes your personal doctor',
-                'content': f'As AI becomes more sophisticated, we are approaching a point where AI systems could provide better health advice than human doctors. What are the implications for healthcare?',
-                'subreddit': 'singularity',
-                'author': 'ai_health_futurist',
-                'upvotes': 201,
-                'comments_count': 78,
-                'url': 'https://www.reddit.com/r/singularity/comments/1ba7n8k/singularity_health_ai_personal_doctor/',
-                'created_at': str(datetime.now(timezone.utc)),
-                'score': 201
-            },
-            {
-                'id': f'sample_post_8_{hash(query) % 10000}',
-                'title': 'Aging biomarkers: tracking biological age vs chronological age',
-                'content': f'New research shows we can measure biological age through various biomarkers. This could help us understand aging better and develop interventions to slow it down.',
-                'subreddit': 'aging',
-                'author': 'biomarker_researcher',
-                'upvotes': 143,
-                'comments_count': 39,
-                'url': 'https://www.reddit.com/r/aging/comments/1b6k5m2/aging_biomarkers_biological_vs_chronological/',
-                'created_at': str(datetime.now(timezone.utc)),
-                'score': 143
-            }
-        ]
-        
-        # Filter posts based on query relevance
-        query_lower = query.lower()
-        relevant_posts = []
-        for post in sample_posts:
-            if any(keyword in post['title'].lower() or keyword in post['content'].lower() 
-                   for keyword in query_lower.split()):
-                relevant_posts.append(post)
-        
-        # If no relevant posts, return all sample posts
-        if not relevant_posts:
-            relevant_posts = sample_posts
-            
-        return relevant_posts[:count]
 
 # Mock analysis function for testing
 def mock_analyze_post(post):
