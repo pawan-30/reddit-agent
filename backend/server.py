@@ -248,7 +248,12 @@ async def search_reddit_posts(request: SearchRequest):
         posts = scraper.search_reddit(request.query, TARGET_SUBREDDITS, request.max_posts)
         
         if not posts:
-            return {"message": "No posts found", "posts": [], "analysis": []}
+            return {
+                "message": f"No posts found for '{request.query}'. Reddit may be blocking requests or no relevant posts exist in the target communities.",
+                "posts": [], 
+                "query": request.query,
+                "suggestion": "Try different keywords or check if the subreddits contain relevant discussions."
+            }
         
         # Store posts in database
         stored_posts = []
@@ -267,7 +272,7 @@ async def search_reddit_posts(request: SearchRequest):
             stored_posts.append(reddit_post)
         
         return {
-            "message": f"Found {len(stored_posts)} posts",
+            "message": f"Found {len(stored_posts)} posts from Reddit search for '{request.query}'",
             "posts": [post.dict() for post in stored_posts],
             "query": request.query
         }
