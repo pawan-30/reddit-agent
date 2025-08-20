@@ -262,7 +262,12 @@ async def search_reddit_posts(request: SearchRequest):
             # Check if post already exists
             existing = await db.reddit_posts.find_one({"id": reddit_post.id})
             if not existing:
-                await db.reddit_posts.insert_one(reddit_post.dict())
+                # Convert to dict and ensure proper serialization
+                post_dict = reddit_post.dict()
+                # Convert datetime to ISO string for MongoDB storage
+                if isinstance(post_dict.get('scraped_at'), datetime):
+                    post_dict['scraped_at'] = post_dict['scraped_at'].isoformat()
+                await db.reddit_posts.insert_one(post_dict)
             stored_posts.append(reddit_post)
         
         return {
@@ -272,6 +277,7 @@ async def search_reddit_posts(request: SearchRequest):
         }
         
     except Exception as e:
+        print(f"Error in search_reddit_posts: {e}")
         raise HTTPException(status_code=500, detail=str(e))
 
 @app.post("/api/analyze-posts")
