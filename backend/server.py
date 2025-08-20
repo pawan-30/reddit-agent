@@ -303,6 +303,65 @@ def mock_analyze_post(post):
         "targeting_insights": f"The r/{post['subreddit']} community shows interest in health optimization topics."
     }
 
+def create_demonstration_posts(query: str) -> List[RedditPost]:
+    """Create demonstration posts that show how the agent would work with real data"""
+    demo_data = [
+        {
+            'id': f'demo_{hash(query) % 1000}_1',
+            'title': f'New breakthrough in personalized {query} research - AI predicts optimal interventions',
+            'content': f'Researchers have developed an AI system that can predict the most effective {query} interventions for individuals based on their genetic markers, lifestyle data, and biomarkers. Early trials show 40% better outcomes compared to standard approaches. The system integrates data from wearables and lab tests to provide personalized recommendations.',
+            'subreddit': 'longevity',
+            'author': f'{query}_researcher_2024',
+            'upvotes': 342,
+            'comments_count': 87,
+            'url': f'https://www.reddit.com/r/longevity/comments/demo_{query}_research/',
+            'created_at': str(datetime.now(timezone.utc) - timedelta(hours=6)),
+            'score': 342
+        },
+        {
+            'id': f'demo_{hash(query) % 1000}_2',
+            'title': f'How wearable tech is revolutionizing {query} tracking - my 6-month experiment',
+            'content': f'I spent 6 months tracking every aspect of my health using various wearables and apps. The data revealed surprising insights about my {query} patterns and helped me optimize my lifestyle. Here are the key findings and recommendations for anyone interested in self-quantification.',
+            'subreddit': 'QuantifiedSelf',
+            'author': 'biohacker_qself',
+            'upvotes': 156,
+            'comments_count': 43,
+            'url': f'https://www.reddit.com/r/QuantifiedSelf/comments/demo_wearable_{query}/',
+            'created_at': str(datetime.now(timezone.utc) - timedelta(hours=12)),
+            'score': 156
+        },
+        {
+            'id': f'demo_{hash(query) % 1000}_3',
+            'title': f'The future of {query}: AI-driven preventive medicine in 2024',
+            'content': f'Major healthcare companies are investing billions in AI systems that can predict health outcomes decades in advance. These systems analyze genomic data, environmental factors, and lifestyle choices to provide personalized {query} recommendations. What does this mean for the future of healthcare?',
+            'subreddit': 'Futurology',
+            'author': 'future_health_expert',
+            'upvotes': 289,
+            'comments_count': 92,
+            'url': f'https://www.reddit.com/r/Futurology/comments/demo_ai_{query}_future/',
+            'created_at': str(datetime.now(timezone.utc) - timedelta(hours=18)),
+            'score': 289
+        },
+        {
+            'id': f'demo_{hash(query) % 1000}_4',
+            'title': f'Scientific study: Personalized nutrition based on microbiome analysis improves {query}',
+            'content': f'A new peer-reviewed study published in Nature shows that personalized nutrition recommendations based on individual microbiome analysis can significantly improve {query} outcomes. The study followed 1,200 participants over 2 years and found personalized interventions were 3x more effective than generic advice.',
+            'subreddit': 'science',
+            'author': 'science_communicator',
+            'upvotes': 421,
+            'comments_count': 134,
+            'url': f'https://www.reddit.com/r/science/comments/demo_microbiome_{query}/',
+            'created_at': str(datetime.now(timezone.utc) - timedelta(hours=24)),
+            'score': 421
+        }
+    ]
+    
+    demo_posts = []
+    for post_data in demo_data:
+        demo_posts.append(RedditPost(**post_data))
+    
+    return demo_posts
+
 # API Routes
 @app.post("/api/search-reddit")
 async def search_reddit_posts(request: SearchRequest):
