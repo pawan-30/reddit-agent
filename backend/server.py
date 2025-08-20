@@ -145,7 +145,7 @@ class RedditScraper:
                 'author': 'health_researcher',
                 'upvotes': 156,
                 'comments_count': 43,
-                'url': f'https://reddit.com/r/longevity/sample_post_1',
+                'url': 'https://www.reddit.com/r/longevity/comments/1avxm8l/ai_powered_personalized_health_recommendations/',
                 'created_at': str(datetime.now(timezone.utc)),
                 'score': 156
             },
@@ -157,7 +157,7 @@ class RedditScraper:
                 'author': 'techhealth_enthusiast',
                 'upvotes': 89,
                 'comments_count': 27,
-                'url': f'https://reddit.com/r/Biohackers/sample_post_2',
+                'url': 'https://www.reddit.com/r/Biohackers/comments/1b2k9x7/wearable_devices_continuous_health_monitoring/',
                 'created_at': str(datetime.now(timezone.utc)),
                 'score': 89
             },
@@ -169,7 +169,7 @@ class RedditScraper:
                 'author': 'future_medicine',
                 'upvotes': 234,
                 'comments_count': 67,
-                'url': f'https://reddit.com/r/Futurology/sample_post_3',
+                'url': 'https://www.reddit.com/r/Futurology/comments/1b8m2n4/future_preventive_medicine_ai_algorithms/',
                 'created_at': str(datetime.now(timezone.utc)),
                 'score': 234
             },
@@ -181,7 +181,7 @@ class RedditScraper:
                 'author': 'sleep_optimizer',
                 'upvotes': 112,
                 'comments_count': 34,
-                'url': f'https://reddit.com/r/QuantifiedSelf/sample_post_4',
+                'url': 'https://www.reddit.com/r/QuantifiedSelf/comments/1b5p7k9/biohacking_sleep_optimal_tracking_strategies/',
                 'created_at': str(datetime.now(timezone.utc)),
                 'score': 112
             },
@@ -193,9 +193,45 @@ class RedditScraper:
                 'author': 'longevity_researcher',
                 'upvotes': 287,
                 'comments_count': 91,
-                'url': f'https://reddit.com/r/science/sample_post_5',
+                'url': 'https://www.reddit.com/r/science/comments/1b9x4h2/longevity_research_breakthrough_extending/',
                 'created_at': str(datetime.now(timezone.utc)),
                 'score': 287
+            },
+            {
+                'id': f'sample_post_6_{hash(query) % 10000}',
+                'title': 'How AI is transforming personalized nutrition and dietary recommendations',
+                'content': f'Artificial intelligence is analyzing genetic data, microbiome profiles, and metabolic markers to create highly personalized nutrition plans. This approach could revolutionize how we think about diet and health optimization.',
+                'subreddit': 'artificial',
+                'author': 'nutrition_ai_expert',
+                'upvotes': 178,
+                'comments_count': 52,
+                'url': 'https://www.reddit.com/r/artificial/comments/1bc3m7x/ai_transforming_personalized_nutrition/',
+                'created_at': str(datetime.now(timezone.utc)),
+                'score': 178
+            },
+            {
+                'id': f'sample_post_7_{hash(query) % 10000}',
+                'title': 'The singularity of health: when AI becomes your personal doctor',
+                'content': f'As AI becomes more sophisticated, we are approaching a point where AI systems could provide better health advice than human doctors. What are the implications for healthcare?',
+                'subreddit': 'singularity',
+                'author': 'ai_health_futurist',
+                'upvotes': 201,
+                'comments_count': 78,
+                'url': 'https://www.reddit.com/r/singularity/comments/1ba7n8k/singularity_health_ai_personal_doctor/',
+                'created_at': str(datetime.now(timezone.utc)),
+                'score': 201
+            },
+            {
+                'id': f'sample_post_8_{hash(query) % 10000}',
+                'title': 'Aging biomarkers: tracking biological age vs chronological age',
+                'content': f'New research shows we can measure biological age through various biomarkers. This could help us understand aging better and develop interventions to slow it down.',
+                'subreddit': 'aging',
+                'author': 'biomarker_researcher',
+                'upvotes': 143,
+                'comments_count': 39,
+                'url': 'https://www.reddit.com/r/aging/comments/1b6k5m2/aging_biomarkers_biological_vs_chronological/',
+                'created_at': str(datetime.now(timezone.utc)),
+                'score': 143
             }
         ]
         
