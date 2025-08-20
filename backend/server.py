@@ -88,54 +88,115 @@ class RedditScraper:
         self.session = requests.Session()
         self.session.headers.update(self.headers)
 
-    def scrape_subreddit_search(self, subreddit: str, query: str, limit: int = 10) -> List[Dict]:
-        """Search posts within a specific subreddit"""
+    def scrape_with_pushshift(self, subreddit: str, query: str, limit: int = 10) -> List[Dict]:
+        """Try using Pushshift API as an alternative"""
         try:
-            # Use Reddit search within subreddit
-            search_url = f"https://www.reddit.com/r/{subreddit}/search.json?q={query}&restrict_sr=1&sort=hot&limit={limit}"
+            # Pushshift API endpoint
+            url = f"https://api.pushshift.io/reddit/search/submission/"
+            params = {
+                'subreddit': subreddit,
+                'q': query,
+                'size': limit,
+                'sort': 'score',
+                'sort_type': 'desc'
+            }
             
             import time
-            time.sleep(1)  # Rate limiting
+            time.sleep(0.5)
             
-            response = self.session.get(search_url, timeout=10)
-            response.raise_for_status()
-            
-            data = response.json()
-            posts = []
-            
-            for item in data.get('data', {}).get('children', []):
-                post_data = item.get('data', {})
+            response = self.session.get(url, params=params, timeout=10)
+            if response.status_code == 200:
+                data = response.json()
+                posts = []
                 
-                # Skip if deleted or removed
-                if post_data.get('removed_by_category') or not post_data.get('title'):
+                for item in data.get('data', []):
+                    if not item.get('title'):
+                        continue
+                        
+                    post = {
+                        'id': item.get('id', ''),
+                        'title': item.get('title', ''),
+                        'content': item.get('selftext', ''),
+                        'subreddit': subreddit,
+                        'author': item.get('author', '[deleted]'),
+                        'upvotes': item.get('score', 0),
+                        'comments_count': item.get('num_comments', 0),
+                        'url': f"https://www.reddit.com/r/{subreddit}/comments/{item.get('id', '')}",
+                        'created_at': str(datetime.fromtimestamp(item.get('created_utc', 0), tz=timezone.utc)),
+                        'score': item.get('score', 0)
+                    }
+                    posts.append(post)
+                    
+                return posts
+        except Exception as e:
+            print(f"Error with Pushshift for r/{subreddit}: {e}")
+            return []
+
+    def scrape_subreddit_search(self, subreddit: str, query: str, limit: int = 10) -> List[Dict]:
+        """Search posts within a specific subreddit using multiple methods"""
+        try:
+            # Try multiple Reddit endpoints
+            search_urls = [
+                f"https://www.reddit.com/r/{subreddit}/search.json?q={query}&restrict_sr=1&sort=relevance&limit={limit}",
+                f"https://www.reddit.com/search.json?q={query}+subreddit:{subreddit}&sort=relevance&limit={limit}",
+            ]
+            
+            for search_url in search_urls:
+                try:
+                    import time
+                    time.sleep(1)  # Rate limiting
+                    
+                    response = self.session.get(search_url, timeout=10)
+                    if response.status_code == 200:
+                        data = response.json()
+                        posts = []
+                        
+                        for item in data.get('data', {}).get('children', []):
+                            post_data = item.get('data', {})
+                            
+                            # Skip if deleted or removed
+                            if post_data.get('removed_by_category') or not post_data.get('title'):
+                                continue
+                                
+                            post = {
+                                'id': post_data.get('id', ''),
+                                'title': post_data.get('title', ''),
+                                'content': post_data.get('selftext', ''),
+                                'subreddit': subreddit,
+                                'author': post_data.get('author', '[deleted]'),
+                                'upvotes': post_data.get('ups', 0),
+                                'comments_count': post_data.get('num_comments', 0),
+                                'url': f"https://www.reddit.com{post_data.get('permalink', '')}",
+                                'created_at': str(datetime.fromtimestamp(post_data.get('created_utc', 0), tz=timezone.utc)),
+                                'score': post_data.get('score', 0)
+                            }
+                            posts.append(post)
+                            
+                        if posts:  # If we got posts, return them
+                            return posts
+                        
+                except requests.exceptions.RequestException as e:
+                    print(f"Failed {search_url}: {e}")
                     continue
                     
-                post = {
-                    'id': post_data.get('id', ''),
-                    'title': post_data.get('title', ''),
-                    'content': post_data.get('selftext', ''),
-                    'subreddit': subreddit,
-                    'author': post_data.get('author', '[deleted]'),
-                    'upvotes': post_data.get('ups', 0),
-                    'comments_count': post_data.get('num_comments', 0),
-                    'url': f"https://www.reddit.com{post_data.get('permalink', '')}",
-                    'created_at': str(datetime.fromtimestamp(post_data.get('created_utc', 0), tz=timezone.utc)),
-                    'score': post_data.get('score', 0)
-                }
-                posts.append(post)
+            # If Reddit APIs fail, try Pushshift
+            pushshift_posts = self.scrape_with_pushshift(subreddit, query, limit)
+            if pushshift_posts:
+                return pushshift_posts
                 
-            return posts
+            return []
         except Exception as e:
             print(f"Error searching r/{subreddit} for '{query}': {e}")
             return []
 
     def scrape_subreddit_hot(self, subreddit: str, limit: int = 10) -> List[Dict]:
-        """Scrape hot posts from a subreddit"""
+        """Scrape hot posts from a subreddit using multiple methods"""
         try:
             # Try multiple approaches
             urls_to_try = [
                 f"https://www.reddit.com/r/{subreddit}/hot.json?limit={limit}",
                 f"https://www.reddit.com/r/{subreddit}.json?limit={limit}",
+                f"https://www.reddit.com/r/{subreddit}/top.json?t=week&limit={limit}",
             ]
             
             for url in urls_to_try:
@@ -171,7 +232,8 @@ class RedditScraper:
                             
                         return posts
                         
-                except requests.exceptions.RequestException:
+                except requests.exceptions.RequestException as e:
+                    print(f"Failed {url}: {e}")
                     continue
                     
             return []
@@ -201,13 +263,17 @@ class RedditScraper:
                 ]
                 all_posts.extend(relevant_hot_posts)
             
-        # If no posts found, return error message
-        if not all_posts:
-            return []
-            
+        # Remove duplicates based on post ID
+        seen_ids = set()
+        unique_posts = []
+        for post in all_posts:
+            if post['id'] not in seen_ids:
+                seen_ids.add(post['id'])
+                unique_posts.append(post)
+        
         # Sort by score and limit
-        all_posts.sort(key=lambda x: x.get('score', 0), reverse=True)
-        return all_posts[:max_posts]
+        unique_posts.sort(key=lambda x: x.get('score', 0), reverse=True)
+        return unique_posts[:max_posts]
 
 # Mock analysis function for testing
 def mock_analyze_post(post):
