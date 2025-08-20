@@ -127,7 +127,7 @@ class RedditScraper:
             all_posts.extend(posts)
             
         # If no posts were scraped (due to blocking), generate sample posts
-        if not all_post
+        if not all_posts:
             all_posts = self.generate_sample_posts(query, subreddits[:5], max_posts)
             
         # Sort by score and limit
