@@ -10,12 +10,17 @@ import asyncio
 import requests
 from bs4 import BeautifulSoup
 import re
+from fastapi import APIRouter, HTTPException, Query
+from pydantic import BaseModel
+from typing import List, Dict
 from urllib.parse import urljoin, urlparse
 from dotenv import load_dotenv
 from motor.motor_asyncio import AsyncIOMotorClient
 
 # Load environment variables
 load_dotenv()
+
+router = APIRouter()
 
 app = FastAPI(title="Reddit Tracking Agent")
 
@@ -29,9 +34,11 @@ app.add_middleware(
 )
 
 # Database setup
-MONGO_URL = os.environ.get("MONGO_URL", "mongodb://localhost:27017/app_db")
-client = AsyncIOMotorClient(MONGO_URL)
-db = client.get_database()
+# MONGO_URL = os.environ.get("MONGO_URL", "mongodb+srv://user:<reddit123>@reddit.kbmr4rf.mongodb.net/?retryWrites=true&w=majority&appName=reddit")
+client = AsyncIOMotorClient(
+    "mongodb+srv://user:123@reddit.kbmr4rf.mongodb.net/?retryWrites=true&w=majority&appName=reddit"
+)
+db = client.get_database("reddit")  # Replace with your actual DB name
 
 # Pydantic models
 class SearchRequest(BaseModel):
