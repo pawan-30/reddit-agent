@@ -30,7 +30,7 @@ app.add_middleware(
 )
 
 # Database setup
-MONGO_URL = os.environ.get("MONGO_URL", "mongodb://localhost:27017/app_db")
+MONGO_URL = os.environ.get("MONGO_URL", "=mongodb+srv://user:reddit123@reddit.kbmr4rf.mongodb.net/?retryWrites=true&w=majority&appName=reddit")
 client = AsyncIOMotorClient(MONGO_URL)
 db = client.get_database()
 
