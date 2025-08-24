@@ -1,10 +1,4 @@
-# Project Setup Guide
-
 reddit-agent
-
----
-
-## 🚀 Backend Setup
 
 1. Navigate to the backend folder:
    ```bash
