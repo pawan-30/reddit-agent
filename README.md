@@ -1,14 +1,20 @@
-# Here are your Instructions
-to setup backend
-go to the backend folder i.e. cd backend
+# Project Setup Guide
 
-install these two commands:
-``
-npm install ajv@6 ajv-keywords@3 --save-dev --legacy-peer-deps
-npm install --legacy-peer-deps
-and then run using:
-npm start
+reddit-agent
 
-in frontend use 
-npm install @craco/craco --save-dev
-npm start
+---
+
+## 🚀 Backend Setup
+
+1. Navigate to the backend folder:
+   ```bash
+   cd backend
+   npm install ajv@6 ajv-keywords@3 --save-dev --legacy-peer-deps
+   npm install --legacy-peer-deps
+   npm start
+2. Navigate to the frontend folder:
+   ```bash
+   cd frontend
+   npm install @craco/craco --save-dev
+   npm start
+
