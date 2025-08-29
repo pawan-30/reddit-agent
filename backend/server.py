@@ -374,11 +374,14 @@ def create_demonstration_posts(query: str) -> List[RedditPost]:
 async def search_reddit_posts(request: SearchRequest):
     """Search and analyze Reddit posts"""
     try:
+        # return {
+        #     "message": f"Demo mode: Returning demonstration posts for '{request.query}'"}
         scraper = RedditScraper()
-        
+        print("hi")
+    
         # Search Reddit posts
         posts = scraper.search_reddit(request.query, TARGET_SUBREDDITS, request.max_posts)
-        
+        print("bye")
         if not posts:
             return {
                 "message": f"No posts found for '{request.query}'. Reddit may be blocking requests or no relevant posts exist in the target communities.",
@@ -412,7 +415,6 @@ async def search_reddit_posts(request: SearchRequest):
     except Exception as e:
         print(f"Error in search_reddit_posts: {e}")
         raise HTTPException(status_code=500, detail=str(e))
-
 @app.post("/api/analyze-posts")
 async def analyze_posts(post_ids: List[str]):
     """Analyze posts for relevance and extract insights"""
