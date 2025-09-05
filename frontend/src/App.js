@@ -18,7 +18,7 @@ import { Separator } from './components/ui/separator';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from './components/ui/tooltip';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from './components/ui/dialog';
 
-const BACKEND_URL = process.env.REACT_APP_BACKEND_URL || 'http://0.0.0.0:8001';
+const BACKEND_URL = process.env.REACT_APP_BACKEND_URL || 'http://localhost:8001';
 
 function App() {
   const [searchQuery, setSearchQuery] = useState('');
@@ -191,25 +191,32 @@ External Space (Collective Data)
       return;
     }
 
+    console.log('Starting search with query:', searchQuery);
+    console.log('Backend URL:', BACKEND_URL);
+
     setLoading(true);
     setError('');
     setSuccess('');
 
     try {
+      console.log('Making request to:', `${BACKEND_URL}/api/search-reddit`);
       const response = await axios.post(`${BACKEND_URL}/api/search-reddit`, {
         query: searchQuery,
         company_description: companyDescription,
         max_posts: 20
       });
 
+      console.log('Search response:', response.data);
+
       if (response.data.posts && response.data.posts.length > 0) {
         setSuccess(`Found ${response.data.posts.length} posts!`);
         loadPosts();
         setActiveTab('posts');
       } else {
-        setError('No posts found for this query');
+        setError(response.data.message || 'No posts found for this query');
       }
     } catch (error) {
+      console.error('Search error:', error);
       setError('Error searching Reddit: ' + (error.response?.data?.detail || error.message));
     } finally {
       setLoading(false);
@@ -484,14 +491,13 @@ External Space (Collective Data)
                     <Button
                       onClick={handleAnalyzePosts}
                       disabled={analyzing || posts.length === 0}
-                      variant="outline"
                       size="lg"
-                      className="flex items-center gap-3 border-2 border-purple-200 hover:border-purple-400 hover:bg-purple-50 dark:hover:bg-purple-950 transition-all duration-300 hover:scale-105 px-6 py-3"
+                      className="flex items-center gap-3 bg-gradient-to-r from-purple-600 via-purple-700 to-violet-700 hover:from-purple-700 hover:via-purple-800 hover:to-violet-800 text-white border-0 shadow-lg hover:shadow-xl transition-all duration-300 hover:scale-105 px-6 py-3"
                     >
                       {analyzing ? (
-                        <RefreshCw className="h-5 w-5 animate-spin text-purple-600" />
+                        <RefreshCw className="h-5 w-5 animate-spin" />
                       ) : (
-                        <BarChart3 className="h-5 w-5 text-purple-600" />
+                        <BarChart3 className="h-5 w-5" />
                       )}
                       <span className="font-semibold">{analyzing ? 'Analyzing...' : 'Analyze Posts'}</span>
                     </Button>
@@ -499,14 +505,13 @@ External Space (Collective Data)
                     <Button
                       onClick={handleSynthesizeTrends}
                       disabled={synthesizing || posts.filter(p => p.analysis).length < 2}
-                      variant="outline"
                       size="lg"
-                      className="flex items-center gap-3 border-2 border-teal-200 hover:border-teal-400 hover:bg-teal-50 dark:hover:bg-teal-950 transition-all duration-300 hover:scale-105 px-6 py-3"
+                      className="flex items-center gap-3 bg-gradient-to-r from-green-600 via-emerald-700 to-teal-700 hover:from-green-700 hover:via-emerald-800 hover:to-teal-800 text-white border-0 shadow-lg hover:shadow-xl transition-all duration-300 hover:scale-105 px-6 py-3"
                     >
                       {synthesizing ? (
-                        <RefreshCw className="h-5 w-5 animate-spin text-teal-600" />
+                        <RefreshCw className="h-5 w-5 animate-spin" />
                       ) : (
-                        <TrendingUp className="h-5 w-5 text-teal-600" />
+                        <TrendingUp className="h-5 w-5" />
                       )}
                       <span className="font-semibold">{synthesizing ? 'Synthesizing...' : 'Synthesize Trends'}</span>
                     </Button>
@@ -515,14 +520,57 @@ External Space (Collective Data)
                   <div className="bg-gradient-to-r from-muted/50 to-muted/30 p-4 rounded-xl border border-border/50 backdrop-blur-sm">
                     <div className="flex items-center gap-2 mb-3">
                       <Target className="h-4 w-4 text-blue-500" />
-                      <span className="font-semibold text-foreground">Target Communities</span>
+                      <span className="font-semibold text-foreground">Target Communities (47 subreddits)</span>
                     </div>
-                    <div className="flex flex-wrap gap-2">
-                      {['longevity', 'Futurology', 'science', 'Biohackers', 'artificial', 'singularity', 'health', 'aging', 'QuantifiedSelf'].map((community) => (
-                        <Badge key={community} variant="secondary" className="bg-background/50 hover:bg-background/80 transition-colors duration-200">
-                          r/{community}
-                        </Badge>
-                      ))}
+                    <div className="space-y-3">
+                      {/* Six Pillars Framework Categories */}
+                      <div>
+                        <h4 className="text-xs font-bold text-muted-foreground mb-2 flex items-center gap-1">
+                          <Activity className="h-3 w-3" />
+                          CORE HEALTH & LONGEVITY
+                        </h4>
+                        <div className="flex flex-wrap gap-1.5">
+                          {['longevity', 'aging', 'health', 'QuantifiedSelf', 'Biohackers', 'mitochondria'].map((community) => (
+                            <Badge key={community} className="bg-gradient-to-r from-blue-500 to-purple-500 text-white text-xs px-2 py-0.5">
+                              r/{community}
+                            </Badge>
+                          ))}
+                        </div>
+                      </div>
+                      
+                      <div>
+                        <h4 className="text-xs font-bold text-muted-foreground mb-2 flex items-center gap-1">
+                          <Brain className="h-3 w-3" />
+                          AI & TECHNOLOGY
+                        </h4>
+                        <div className="flex flex-wrap gap-1.5">
+                          {['artificial', 'MachineLearning', 'datascience', 'singularity', 'Futurology', 'HealthTech'].map((community) => (
+                            <Badge key={community} className="bg-gradient-to-r from-green-500 to-teal-500 text-white text-xs px-2 py-0.5">
+                              r/{community}
+                            </Badge>
+                          ))}
+                        </div>
+                      </div>
+                      
+                      <div>
+                        <h4 className="text-xs font-bold text-muted-foreground mb-2 flex items-center gap-1">
+                          <Clock className="h-3 w-3" />
+                          SIX PILLARS COMMUNITIES
+                        </h4>
+                        <div className="flex flex-wrap gap-1.5">
+                          {['sleep', 'nutrition', 'fitness', 'meditation', 'nootropics', 'SkincareAddiction'].map((community) => (
+                            <Badge key={community} className="bg-gradient-to-r from-orange-500 to-red-500 text-white text-xs px-2 py-0.5">
+                              r/{community}
+                            </Badge>
+                          ))}
+                        </div>
+                      </div>
+                      
+                      <div className="pt-2 border-t border-border/30">
+                        <p className="text-xs text-muted-foreground">
+                          <span className="font-semibold">47 total communities</span> spanning Recovery, Nutrition, Movement, Connection, Cognition, and Aesthetics pillars
+                        </p>
+                      </div>
                     </div>
                   </div>
                 </CardContent>

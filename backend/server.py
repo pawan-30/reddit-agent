@@ -79,11 +79,37 @@ class AnalyzeRequest(BaseModel):
     post_ids: List[str]
     company_description: str = ""
 
-# Target subreddits
+# Target subreddits - Comprehensive list aligned with eon.health's Six Pillars Framework
 TARGET_SUBREDDITS = [
-    "longevity", "Futurology", "science", "Biohackers", 
-    "artificial", "singularity", "health", "mitochondria", 
-    "aging", "QuantifiedSelf"
+    # Core Health & Longevity
+    "longevity", "aging", "health", "QuantifiedSelf", "Biohackers", "mitochondria",
+    
+    # AI & Technology
+    "artificial", "MachineLearning", "datascience", "singularity", "Futurology", "HealthTech",
+    
+    # Recovery & Sleep Pillar
+    "sleep", "sleephackers", "insomnia", "sleepapnea", "recovery", "sauna",
+    
+    # Nutrition Pillar
+    "nutrition", "intermittentfasting", "keto", "carnivore", "PlantBasedDiet", "Supplements",
+    
+    # Movement & Fitness Pillar
+    "fitness", "bodyweightfitness", "running", "strength_training", "flexibility", "yoga",
+    
+    # Connection & Mental Health Pillar
+    "meditation", "mindfulness", "mentalhealth", "socialskills", "getmotivated", "decidingtobebetter",
+    
+    # Cognition Pillar
+    "nootropics", "GetStudying", "BrainTraining", "languagelearning", "productivity",
+    
+    # Aesthetics & Wellness Pillar
+    "SkincareAddiction", "HaircareScience", "DentalHygiene", "beauty", "wellness",
+    
+    # Data & Analytics
+    "dataisbeautiful", "statistics", "PersonalFinance", "selfimprovement",
+    
+    # Biomarkers & Testing
+    "bloodwork", "Testosterone", "thyroid", "ADHD", "diabetes"
 ]
 
 class RedditScraper:
