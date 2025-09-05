@@ -5,7 +5,7 @@ reddit-agent
    cd backend
    npm install ajv@6 ajv-keywords@3 --save-dev --legacy-peer-deps
    npm install --legacy-peer-deps
-   npm start
+   python server.py
 2. Navigate to the frontend folder:
    ```bash
    cd frontend
